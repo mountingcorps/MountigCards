@@ -1,204 +1,263 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
+  <title>Standorte (fix geokodiert) – mit Legende</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mounting Corps – Einsatzorte & Standorte (Deutschlandkarte)</title>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
+  <!-- Leaflet CSS (CDN) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
-    :root {
-      --brand-green: #95c01e;
-      --hq-red: #d9042b;
-      --ink: #1a1a1a;
-      --muted: #6b7280;
-      --panel: rgba(255,255,255,0.95);
-      --shadow: 0 10px 30px rgba(0,0,0,0.12);
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100%; width: 100%; }
+    :root{
+      --site: #2ecc71; /* grün */
+      --hq:   #e74c3c; /* rot  */
+      --card-bg: #ffffff;
+      --card-border: rgba(0,0,0,.08);
+      --shadow: 0 6px 24px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.08);
       --radius: 14px;
     }
-    html, body { height: 100%; margin: 0; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif; color: var(--ink); }
-    #map { height: 100vh; width: 100vw; }
-
-    .app-header {
+    .legend {
       position: absolute;
-      top: 16px; left: 16px; right: 16px;
-      display: flex; gap: 12px; align-items: center; justify-content: space-between;
-      z-index: 1000; pointer-events: none;
-    }
-    .title-card {
-      pointer-events: auto;
-      background: var(--panel);
-      padding: 14px 16px;
+      z-index: 400;
+      top: 12px;
+      left: 12px;
+      background: var(--card-bg);
+      padding: 12px 14px;
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      backdrop-filter: blur(6px);
-      display: flex; align-items: center; gap: 12px;
+      border: 1px solid var(--card-border);
+      font: 14px/1.35 system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      max-width: 320px;
     }
-    .title-dot {
-      width: 12px; height: 12px; border-radius: 50%;
-      background: var(--brand-green);
-      box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgba(0,0,0,0.06);
+    .legend h3{
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .2px;
     }
-    .title h1 { margin: 0; font-size: 16px; line-height: 1.1; font-weight: 700; }
-    .title p { margin: 2px 0 0 0; font-size: 12px; color: var(--muted); }
-
-    .status {
-      pointer-events: auto;
-      background: var(--panel);
-      padding: 10px 12px;
+    .legend ul{
+      list-style: none;
+      padding: 0;
+      margin: 6px 0 0 0;
+      display: grid;
+      gap: 6px;
+    }
+    .legend li{
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .dot{
+      width: 12px;
+      height: 12px;
       border-radius: 999px;
-      box-shadow: var(--shadow);
-      font-size: 12px;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.15);
+    }
+    .dot--site{ background: var(--site); }
+    .dot--hq{   background: var(--hq); }
+
+    .leaflet-tooltip { font-weight: 600; }
+
+    /* Für PDF-/Druckausgabe optimieren */
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      html, body, #map { height: auto; }
+      .legend {
+        position: fixed;
+        top: 10mm;
+        left: 10mm;
+        box-shadow: none;
+        border: 1px solid #ccc;
+      }
+    }
+  
+    /* --- Graustufen-Look für die Karte (moderner) --- */
+    .leaflet-tile {
+      filter: grayscale(90%) contrast(1.05) brightness(1.02);
+    }
+    /* Leichtes Grau für Karten-UI & Legende */
+    :root{
+      --card-bg: #f7f7f8; /* moderner, leicht grauer Hintergrund */
+      --card-border: rgba(0,0,0,.10);
+      --shadow: 0 6px 24px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.06);
+    }
+    /* Footer-Stil */
+    .page-footer{
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 10px 16px;
+      font: 12px/1.4 system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      color: #444;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(4px);
+      border-top: 1px solid rgba(0,0,0,.08);
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      z-index: 500;
+    }
+    .page-footer .dot{
+      width: 8px; height: 8px; border: none; box-shadow: none;
+    }
+    @media print {
+      .page-footer{
+        position: fixed;
+        bottom: 8mm;
+        left: 10mm;
+        right: 10mm;
+        background: transparent;
+        border-top: 1px solid #bbb;
+      }
     }
 
-    .legend {
-      position: absolute; bottom: 16px; left: 16px;
-      z-index: 1000; background: var(--panel); padding: 12px 14px;
-      border-radius: var(--radius); box-shadow: var(--shadow);
-      font-size: 13px; pointer-events: auto;
-    }
-    .legend .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-    .legend .swatch {
-      width: 14px; height: 14px; border-radius: 50%;
-      box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgba(0,0,0,0.06);
-    }
-    .legend .site { background: var(--brand-green); }
-    .legend .hq { background: var(--hq-red); }
-    .legend .hint { color: var(--muted); margin-top: 6px; }
-
-    .leaflet-tooltip {
-      font-weight: 600;
-      font-size: 12px;
-      border-radius: 8px;
-      padding: 6px 8px;
-      box-shadow: var(--shadow);
-    }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <div class="app-header">
-    <div class="title-card">
-      <div class="title-dot" aria-hidden="true"></div>
-      <div class="title">
-        <h1>Mounting Corps – Einsatzorte &amp; Standorte</h1>
-        <p>Grüne Marker = Baustellen (Einsatzorte) · Rote Marker = Hauptstandort &amp; 2. Sitz</p>
-      </div>
-    </div>
-    <div class="status" id="status">Lade Karte …</div>
+  <!-- Moderne, kompakte Legende (oben links) -->
+  <div class="legend" aria-label="Legende">
+    <h3>Mounting Corps – Auszug unsere bundesweiten Projekte</h3>
+    <ul>
+      <li><span class="dot dot--site" aria-hidden="true"></span><span>Grüne Marker = Baustellen (Einsatzorte)</span></li>
+      <li><span class="dot dot--hq" aria-hidden="true"></span><span>Rote Marker = Mounting Corps Standort</span></li>
+    </ul>
   </div>
 
-  <div class="legend" role="note" aria-label="Legende">
-    <div class="row"><span class="swatch site"></span>Baustellen (Einsatzorte)</div>
-    <div class="row"><span class="swatch hq"></span>Hauptstandort &amp; 2. Sitz</div>
-    <div class="hint">Tipp: Mit der Maus über einen Marker fahren, um den vollen Namen zu sehen. Klicken für Adresse.</div>
-  </div>
-
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin="">
-  </script>
+  <!-- Leaflet JS (CDN) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const BRAND_GREEN = getComputedStyle(document.documentElement).getPropertyValue('--brand-green').trim();
-    const HQ_RED = getComputedStyle(document.documentElement).getPropertyValue('--hq-red').trim();
-
+    // Feste Koordinaten – KEIN Geocoding, KEIN fetch
     const SITES = [
-      { name: "Bäckerei Morgenglut", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" },
-      { name: "Bäckerei Sonnenglanz", address: "Alte Schönhauser Str. 4, 10119 Berlin, Deutschland" },
-      { name: "Bäckerei Morgenrot", address: "Reichenberger Str. 101, 10999 Berlin, Deutschland" },
-      { name: "Bäckerei Abendgold", address: "Linienstraße 54, 10119 Berlin, Deutschland" },
-      { name: "Bäckerei Frühling", address: "Hermannstraße 37, 12049 Berlin, Deutschland" },
-      { name: "Bäckerei Tagesanbruch", address: "Bartningallee 29, 10557 Berlin, Deutschland" },
-      { name: "Bäckerei Kornfeld (Hauptsitz)", address: "Mühlheim am Main, Deutschland" },
-      { name: "Bäckerei Altes Haus", address: "Kreittmayrstraße 5, 80335 München, Deutschland" },
-      { name: "Bäckerei Bretzeltraum (Hauptsitz)", address: "Mainz, Deutschland" },
-      { name: "Bäckerei Frankenkruste", address: "Tennenlohe, Erlangen, Deutschland" },
-      { name: "Bäckerei Tradition", address: "Gütersloh, Deutschland" },
-      { name: "Bäckerei Dorfkruste", address: "Büchenbach, Pegnitz, Deutschland" },
-      { name: "Bäckerei Steinbrot", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" },
-      { name: "Bäckerei Seelenruhe", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" },
-      { name: "Bäckerei Lebensquell", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" }
+      { name: "Bäckerei & Konditorei", address: "09456 Annaberg-Buchholz, Deutschland", lat: 50.5800, lng: 13.0022 },
+      { name: "Bäckerei", address: "13357 Berlin, Deutschland", lat: 52.5486, lng: 13.3903 },
+      { name: "Bäckerei", address: "01067 Dresden, Deutschland", lat: 51.0493, lng: 13.7381 },
+      { name: "Bäckerei", address: "15732 Eichwalde, Deutschland", lat: 52.3667, lng: 13.6167 },
+      { name: "Bäckerei", address: "04603 Nobitz-Altenburg, Deutschland", lat: 50.9800, lng: 12.4330 },
+      { name: "Bäckerei & Konditorei", address: "06526 Sangerhausen, Deutschland", lat: 51.4670, lng: 11.3000 },
+      { name: "Bäckerei & Konditorei", address: "99084 Erfurt, Deutschland", lat: 50.9780, lng: 11.0320 },
+      { name: "Bäckerei & Konditorei", address: "34576 Homberg, Deutschland", lat: 51.0330, lng: 9.4000 },
+      { name: "Bäckerei & Konditorei", address: "34632 Jesberg, Deutschland", lat: 51.0000, lng: 9.1830 },
+      { name: "Bäckerei & Konditorei", address: "29331 Lachendorf, Deutschland", lat: 52.6220, lng: 10.2830 },
+      { name: "Back- & Kaffee-Stübchen", address: "27336 Rethem (Aller), Deutschland", lat: 52.7700, lng: 9.3830 },
+      { name: "Baumarkt", address: "38100 Braunschweig, Deutschland", lat: 52.2690, lng: 10.5260 },
+      { name: "Baumarkt", address: "04617 Lödla, Deutschland", lat: 50.9810, lng: 12.4170 },
+      { name: "Edeka", address: "54666 Irrel, Deutschland", lat: 49.8560, lng: 6.4520 },
+      { name: "Fleischerei", address: "37120 Bovenden, Deutschland", lat: 51.5850, lng: 9.9320 },
+      { name: "Fleischerei (HIT)", address: "53859 Niederkassel-Rheidt, Deutschland", lat: 50.8000, lng: 7.0300 },
+      { name: "Fleischerei (HIT)", address: "54595 Prüm, Deutschland", lat: 50.2080, lng: 6.4210 },
+      { name: "Globus", address: "93047 Regensburg, Deutschland", lat: 49.0190, lng: 12.0980 },
+      { name: "Globus Baumarkt", address: "94447 Plattling, Deutschland", lat: 48.7780, lng: 12.8700 },
+      { name: "Kaufland", address: "44787 Bochum, Deutschland", lat: 51.4810, lng: 7.2160 },
+      { name: "KaDeWe (Shop in Shop)", address: "10789 Berlin, Deutschland", lat: 52.5030, lng: 13.3390 },
+      { name: "Krankenhaus am Chiemsee", address: "83209 Prien am Chiemsee, Deutschland", lat: 47.8570, lng: 12.3470 },
+      { name: "LIDL-Filiale", address: "55294 Bodenheim, Deutschland", lat: 49.9190, lng: 8.3190 },
+      { name: "LIDL-Filiale", address: "84489 Burghausen, Deutschland", lat: 48.1690, lng: 12.8330 },
+      { name: "LIDL-Filiale", address: "84130 Dingolfing, Deutschland", lat: 48.6390, lng: 12.4920 },
+      { name: "LIDL-Filiale", address: "84051 Essenbach, Deutschland", lat: 48.6100, lng: 12.2270 },
+      { name: "LIDL-Filiale", address: "20095 Hamburg, Deutschland", lat: 53.5500, lng: 10.0000 },
+      { name: "LIDL-Filiale", address: "37308 Heilbad Heiligenstadt, Deutschland", lat: 51.3780, lng: 10.1390 },
+      { name: "LIDL-Filiale", address: "49477 Ibbenbüren, Deutschland", lat: 52.2790, lng: 7.7140 },
+      { name: "LIDL-Filiale", address: "80331 München, Deutschland", lat: 48.1372, lng: 11.5756 },
+      { name: "LIDL-Filiale", address: "39104 Magdeburg, Deutschland", lat: 52.1300, lng: 11.6200 },
+      { name: "Logistikzentrum", address: "04889 Doberschütz, Deutschland", lat: 51.4940, lng: 12.7440 },
+      { name: "Logistikzentrum", address: "91052 Erlangen, Deutschland", lat: 49.5890, lng: 11.0070 },
+      { name: "Logistikzentrum", address: "04103 Leipzig, Deutschland", lat: 51.3420, lng: 12.3870 },
+      { name: "Logistikzentrum", address: "04420 Markranstädt OT Großlehna, Deutschland", lat: 51.2920, lng: 12.2140 },
+      { name: "Logistikzentrum", address: "04435 Wiedemar, Deutschland", lat: 51.4680, lng: 12.2140 },
+      { name: "Messegelände", address: "04356 Leipzig, Deutschland", lat: 51.4100, lng: 12.3940 },
+      { name: "Netto", address: "02826 Görlitz, Deutschland", lat: 51.1530, lng: 14.9910 },
+      { name: "Rewe", address: "99084 Erfurt, Deutschland", lat: 50.9780, lng: 11.0320 },
+      { name: "Schule", address: "04109 Leipzig, Deutschland", lat: 51.3380, lng: 12.3730 },
+      { name: "Sushi (Shop in Shop)", address: "07545 Gera, Deutschland", lat: 50.8790, lng: 12.0820 },
+      { name: "Ausstellung (Museum)", address: "04109 Leipzig, Deutschland", lat: 51.3380, lng: 12.3730 },
+      { name: "Veranstaltung", address: "04451 Brandis, Deutschland", lat: 51.3330, lng: 12.6110 },
+      { name: "Veranstaltung", address: "40210 Düsseldorf, Deutschland", lat: 51.2210, lng: 6.7900 },
+      { name: "Veranstaltung", address: "50667 Köln, Deutschland", lat: 50.9410, lng: 6.9580 },
+      { name: "Veranstaltung", address: "23769 Timmendorf, Deutschland", lat: 54.4930, lng: 11.0300 },
     ];
 
+    // (Optional) Zwei HQs mit festen Koordinaten
     const HQS = [
-      { name: "Hauptstandort – Mounting Corps", address: "Letschiner Str. 15, 15306 Gusow-Platkow, Deutschland" },
-      { name: "2. Sitz – Mounting Corps", address: "Münzgasse 7, 04017 Leipzig, Deutschland", fallback: "Münzgasse 7, Leipzig, Deutschland" }
+      { name: "Hauptstandort – Mounting Corps", address: "Letschiner Str. 15, 15306 Gusow-Platkow, Deutschland", lat: 52.5550, lng: 14.3040 },
+      { name: "2. Sitz – Mounting Corps", address: "Münzgasse 7, 04109 Leipzig, Deutschland", lat: 51.3396, lng: 12.3731 }
     ];
 
-    const statusEl = document.getElementById('status');
-    const map = L.map('map');
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap, &copy; CARTO',
-      subdomains: 'abcd', maxZoom: 19
+    // Karte anlegen
+    const map = L.map('map', { zoomControl: true });
+
+    // OSM-Kacheln (benötigt Internetzugang, aber keine API-Keys)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "Aus Datenschutzgründen keine genauen Adress-Daten"
     }).addTo(map);
 
-    const siteLayer = L.layerGroup().addTo(map);
-    const hqLayer = L.layerGroup().addTo(map);
-
-    function makeCircleMarker(lat, lng, color, name, address) {
-      const marker = L.circleMarker([lat, lng], {
-        radius: 8, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1
-      });
-      marker.bindTooltip(name, { direction: 'top', offset: [0,-6], opacity: 0.95 });
-      marker.bindPopup(`<strong>${name}</strong><br><small>${address}</small>`);
-      return marker;
+    // Marker-Styles (Kreis-Marker, damit offline ohne eigene Icons funktioniert)
+    function addPoint(lat, lng, color, labelHTML) {
+      const m = L.circleMarker([lat, lng], {
+        radius: 8, color: "#ffffff", weight: 2, fillColor: color, fillOpacity: 1
+      }).addTo(map);
+      m.bindPopup(labelHTML);
+      return m;
     }
 
-    const LS_KEY = 'mc_geocode_cache_v1';
-    const geocodeCache = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    function saveCache() { localStorage.setItem(LS_KEY, JSON.stringify(geocodeCache)); }
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+    const siteColor = getComputedStyle(document.documentElement).getPropertyValue('--site').trim();
+    const hqColor   = getComputedStyle(document.documentElement).getPropertyValue('--hq').trim();
 
-    async function geocodeSingle(query) {
-      const url = new URL('https://nominatim.openstreetmap.org/search');
-      url.searchParams.set('format','jsonv2'); url.searchParams.set('q', query);
-      url.searchParams.set('countrycodes','de'); url.searchParams.set('limit','1');
-      url.searchParams.set('accept-language','de');
-      const resp = await fetch(url.toString());
-      if (!resp.ok) return null;
-      const data = await resp.json();
-      if (data.length) return { lat:+data[0].lat, lon:+data[0].lon };
-      return null;
+    const allLatLngs = [];
+
+    // Sites setzen
+    SITES.forEach(s => {
+      const html = `<strong>${s.name}</strong><br>${s.address}<br><small>${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</small>`;
+      addPoint(s.lat, s.lng, siteColor, html);
+      allLatLngs.push([s.lat, s.lng]);
+    });
+
+    // HQs setzen
+    HQS.forEach(h => {
+      const html = `<strong>${h.name}</strong><br>${h.address}<br><small>${h.lat.toFixed(5)}, ${h.lng.toFixed(5)}</small>`;
+      addPoint(h.lat, h.lng, hqColor, html);
+      allLatLngs.push([h.lat, h.lng]);
+    });
+
+    // Karte passend zoomen
+    if (allLatLngs.length) {
+      map.fitBounds(allLatLngs, { padding: [40, 40] });
+    } else {
+      map.setView([51.163, 10.447], 6); // Deutschland-Mitte Fallback
     }
-
-    async function geocodeWithFallbacks(item) {
-      const key = item.address;
-      if (geocodeCache[key]) return geocodeCache[key];
-      let result = await geocodeSingle(item.address);
-      if (!result && item.fallback) { await sleep(700); result = await geocodeSingle(item.fallback); }
-      if (result) { geocodeCache[key]=result; saveCache(); }
-      return result;
-    }
-
-    (async function init() {
-      try {
-        statusEl.textContent = 'Geocodiere Adressen …';
-        const bounds=[];
-        for (const s of SITES) {
-          await sleep(800);
-          const gc=await geocodeWithFallbacks(s); if(!gc) continue;
-          makeCircleMarker(gc.lat,gc.lon,BRAND_GREEN,s.name,s.address).addTo(siteLayer);
-          bounds.push([gc.lat,gc.lon]);
-        }
-        for (const h of HQS) {
-          await sleep(800);
-          const gc=await geocodeWithFallbacks(h); if(!gc) continue;
-          makeCircleMarker(gc.lat,gc.lon,HQ_RED,h.name,h.address).addTo(hqLayer);
-          bounds.push([gc.lat,gc.lon]);
-        }
-        if(bounds.length) map.fitBounds(bounds,{padding:[40,40]});
-        else map.setView([51.163,10.447],6);
-        L.control.layers(null,{"Baustellen":siteLayer,"Standorte":hqLayer}).addTo(map);
-        statusEl.textContent='Fertig – Karte geladen';
-      } catch(e){ console.error(e); statusEl.textContent='Fehler beim Laden'; }
-    })();
   </script>
+
+  <!-- Fußzeile -->
+  <footer class="page-footer" role="contentinfo" aria-label="Fußzeile">
+    <span><strong>Mounting Corps Ladenbau GmbH</strong></span>
+    <span>•</span>
+    <span>Letschiner Str. 15, 15306 Gusow-Platkow</span>
+    <span>•</span>
+    <span>Stand: 2024</span>
+    <span>•</span>
+	<span style="color: blue; text-decoration: underline; cursor: pointer;"
+      onclick="window.open('https://www.linkedin.com/company/mounting-c/','_blank')">
+  Linkedin
+</span>
+  </footer>
+
+<script>
+    // Datum in der Fußzeile setzen (lokalisiert)
+    (function(){
+      var el = document.querySelector('.js-today');
+      if(el){
+        var d = new Date();
+        el.textContent = d.toLocaleDateString('de-DE');
+      }
+    })();
+</script>
 </body>
 </html>
