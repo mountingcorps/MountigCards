@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mounting Corps – Einsatzorte & Standorte (Deutschlandkarte)</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    :root {
+      --brand-green: #95c01e;
+      --hq-red: #d9042b;
+      --ink: #1a1a1a;
+      --muted: #6b7280;
+      --panel: rgba(255,255,255,0.95);
+      --shadow: 0 10px 30px rgba(0,0,0,0.12);
+      --radius: 14px;
+    }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif; color: var(--ink); }
+    #map { height: 100vh; width: 100vw; }
+
+    .app-header {
+      position: absolute;
+      top: 16px; left: 16px; right: 16px;
+      display: flex; gap: 12px; align-items: center; justify-content: space-between;
+      z-index: 1000; pointer-events: none;
+    }
+    .title-card {
+      pointer-events: auto;
+      background: var(--panel);
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .title-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--brand-green);
+      box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgba(0,0,0,0.06);
+    }
+    .title h1 { margin: 0; font-size: 16px; line-height: 1.1; font-weight: 700; }
+    .title p { margin: 2px 0 0 0; font-size: 12px; color: var(--muted); }
+
+    .status {
+      pointer-events: auto;
+      background: var(--panel);
+      padding: 10px 12px;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+    }
+
+    .legend {
+      position: absolute; bottom: 16px; left: 16px;
+      z-index: 1000; background: var(--panel); padding: 12px 14px;
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      font-size: 13px; pointer-events: auto;
+    }
+    .legend .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+    .legend .swatch {
+      width: 14px; height: 14px; border-radius: 50%;
+      box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgba(0,0,0,0.06);
+    }
+    .legend .site { background: var(--brand-green); }
+    .legend .hq { background: var(--hq-red); }
+    .legend .hint { color: var(--muted); margin-top: 6px; }
+
+    .leaflet-tooltip {
+      font-weight: 600;
+      font-size: 12px;
+      border-radius: 8px;
+      padding: 6px 8px;
+      box-shadow: var(--shadow);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="app-header">
+    <div class="title-card">
+      <div class="title-dot" aria-hidden="true"></div>
+      <div class="title">
+        <h1>Mounting Corps – Einsatzorte &amp; Standorte</h1>
+        <p>Grüne Marker = Baustellen (Einsatzorte) · Rote Marker = Hauptstandort &amp; 2. Sitz</p>
+      </div>
+    </div>
+    <div class="status" id="status">Lade Karte …</div>
+  </div>
+
+  <div class="legend" role="note" aria-label="Legende">
+    <div class="row"><span class="swatch site"></span>Baustellen (Einsatzorte)</div>
+    <div class="row"><span class="swatch hq"></span>Hauptstandort &amp; 2. Sitz</div>
+    <div class="hint">Tipp: Mit der Maus über einen Marker fahren, um den vollen Namen zu sehen. Klicken für Adresse.</div>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin="">
+  </script>
+  <script>
+    const BRAND_GREEN = getComputedStyle(document.documentElement).getPropertyValue('--brand-green').trim();
+    const HQ_RED = getComputedStyle(document.documentElement).getPropertyValue('--hq-red').trim();
+
+    const SITES = [
+      { name: "Bäckerei Morgenglut", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" },
+      { name: "Bäckerei Sonnenglanz", address: "Alte Schönhauser Str. 4, 10119 Berlin, Deutschland" },
+      { name: "Bäckerei Morgenrot", address: "Reichenberger Str. 101, 10999 Berlin, Deutschland" },
+      { name: "Bäckerei Abendgold", address: "Linienstraße 54, 10119 Berlin, Deutschland" },
+      { name: "Bäckerei Frühling", address: "Hermannstraße 37, 12049 Berlin, Deutschland" },
+      { name: "Bäckerei Tagesanbruch", address: "Bartningallee 29, 10557 Berlin, Deutschland" },
+      { name: "Bäckerei Kornfeld (Hauptsitz)", address: "Mühlheim am Main, Deutschland" },
+      { name: "Bäckerei Altes Haus", address: "Kreittmayrstraße 5, 80335 München, Deutschland" },
+      { name: "Bäckerei Bretzeltraum (Hauptsitz)", address: "Mainz, Deutschland" },
+      { name: "Bäckerei Frankenkruste", address: "Tennenlohe, Erlangen, Deutschland" },
+      { name: "Bäckerei Tradition", address: "Gütersloh, Deutschland" },
+      { name: "Bäckerei Dorfkruste", address: "Büchenbach, Pegnitz, Deutschland" },
+      { name: "Bäckerei Steinbrot", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" },
+      { name: "Bäckerei Seelenruhe", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" },
+      { name: "Bäckerei Lebensquell", address: "Oeder Weg 15, 60318 Frankfurt am Main, Deutschland" }
+    ];
+
+    const HQS = [
+      { name: "Hauptstandort – Mounting Corps", address: "Letschiner Str. 15, 15306 Gusow-Platkow, Deutschland" },
+      { name: "2. Sitz – Mounting Corps", address: "Münzgasse 7, 04017 Leipzig, Deutschland", fallback: "Münzgasse 7, Leipzig, Deutschland" }
+    ];
+
+    const statusEl = document.getElementById('status');
+    const map = L.map('map');
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap, &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+
+    const siteLayer = L.layerGroup().addTo(map);
+    const hqLayer = L.layerGroup().addTo(map);
+
+    function makeCircleMarker(lat, lng, color, name, address) {
+      const marker = L.circleMarker([lat, lng], {
+        radius: 8, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1
+      });
+      marker.bindTooltip(name, { direction: 'top', offset: [0,-6], opacity: 0.95 });
+      marker.bindPopup(`<strong>${name}</strong><br><small>${address}</small>`);
+      return marker;
+    }
+
+    const LS_KEY = 'mc_geocode_cache_v1';
+    const geocodeCache = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    function saveCache() { localStorage.setItem(LS_KEY, JSON.stringify(geocodeCache)); }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function geocodeSingle(query) {
+      const url = new URL('https://nominatim.openstreetmap.org/search');
+      url.searchParams.set('format','jsonv2'); url.searchParams.set('q', query);
+      url.searchParams.set('countrycodes','de'); url.searchParams.set('limit','1');
+      url.searchParams.set('accept-language','de');
+      const resp = await fetch(url.toString());
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (data.length) return { lat:+data[0].lat, lon:+data[0].lon };
+      return null;
+    }
+
+    async function geocodeWithFallbacks(item) {
+      const key = item.address;
+      if (geocodeCache[key]) return geocodeCache[key];
+      let result = await geocodeSingle(item.address);
+      if (!result && item.fallback) { await sleep(700); result = await geocodeSingle(item.fallback); }
+      if (result) { geocodeCache[key]=result; saveCache(); }
+      return result;
+    }
+
+    (async function init() {
+      try {
+        statusEl.textContent = 'Geocodiere Adressen …';
+        const bounds=[];
+        for (const s of SITES) {
+          await sleep(800);
+          const gc=await geocodeWithFallbacks(s); if(!gc) continue;
+          makeCircleMarker(gc.lat,gc.lon,BRAND_GREEN,s.name,s.address).addTo(siteLayer);
+          bounds.push([gc.lat,gc.lon]);
+        }
+        for (const h of HQS) {
+          await sleep(800);
+          const gc=await geocodeWithFallbacks(h); if(!gc) continue;
+          makeCircleMarker(gc.lat,gc.lon,HQ_RED,h.name,h.address).addTo(hqLayer);
+          bounds.push([gc.lat,gc.lon]);
+        }
+        if(bounds.length) map.fitBounds(bounds,{padding:[40,40]});
+        else map.setView([51.163,10.447],6);
+        L.control.layers(null,{"Baustellen":siteLayer,"Standorte":hqLayer}).addTo(map);
+        statusEl.textContent='Fertig – Karte geladen';
+      } catch(e){ console.error(e); statusEl.textContent='Fehler beim Laden'; }
+    })();
+  </script>
+</body>
+</html>
